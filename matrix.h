@@ -15,9 +15,56 @@
 #ifndef MATRIX_H_
 #define MATRIX_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
+#define NATIVE_BUILD 0
+#define WASM_BUILD   1
+
+#ifdef __wasm__
+#define BUILD WASM_BUILD
+#endif
+
+#ifndef BUILD
+#define BUILD NATIVE_BUILD
+#endif
+
+#if BUILD == NATIVE_BUILD
+#  include <stdio.h>
+#  include <stdlib.h>
+#  include <assert.h>
+#define gm_malloc(n) malloc((n))
+#define gm_calloc(c, s) calloc((c), (s))
+#define gm_free(p) free(p)
+#define gm_rand() rand()
+#define gm_printf(...) printf(__VA_ARGS__)
+#define GM_RAND_MAX RAND_MAX
+#elif BUILD == WASM_BUILD
+typedef unsigned int size_t;
+
+// Code references in README.md
+extern unsigned char __heap_base;
+unsigned int bump_pointer = (unsigned int)&__heap_base;
+void *gm_malloc(unsigned long n)
+{
+  unsigned int r = bump_pointer;
+  bump_pointer += n;
+  return (void *)r;
+}
+void gm_free(void *p)
+{
+  (void)p;
+}
+void *gm_calloc(unsigned long count, unsigned long size)
+{
+  return gm_malloc(count * size);
+}
+size_t seed = (__TIME__[6] - '0') * 10 + (__TIME__[7] - '0');
+int gm_rand(void)
+{
+  seed = 6364136223846793005ULL*seed + 1;
+  return seed>>33;
+}
+#define GM_RAND_MAX 59
+#define gm_printf(...)
+#endif
 
 #define ROUND_MAX 0.0001f
 
@@ -48,7 +95,7 @@ typedef struct {
   } while (0);									
 
 #define matrix_zero(mat) matrix_set(mat, 0)
-#define rand_normalized(max, min) (float)(min + (max - min) * ((float)rand() / (float)RAND_MAX))
+#define rand_normalized(max, min) (float)(min + (max - min) * ((float)gm_rand() / (float)GM_RAND_MAX))
 #define _is_round_zero(num) ((num) >= -ROUND_MAX && (num) <= ROUND_MAX)
 
 // declarations
@@ -67,12 +114,12 @@ void matrix_round_zero(Matrix *);
 // implementations
 Matrix *matrix_alloc(size_t m, size_t n)
 {
-  Matrix *matrix = malloc(sizeof(Matrix));
-  matrix->buf = calloc(m, sizeof(int *));
+  Matrix *matrix = gm_malloc(sizeof(Matrix));
+  matrix->buf = gm_calloc(m, sizeof(int *));
   matrix->m = m;
   matrix->n = n;
   for (; m > 0; --m) 
-	matrix->buf[m-1] = calloc(n, sizeof(int));
+	matrix->buf[m-1] = gm_calloc(n, sizeof(int));
   
   return matrix;
 }
@@ -80,12 +127,12 @@ Matrix *matrix_alloc(size_t m, size_t n)
 void matrix_free(Matrix *mat)
 {
   for (size_t i = 0; i < mat->m; i++) 
-	free(mat->buf[i]);
+	gm_free(mat->buf[i]);
   
-  free(mat->buf);
+  gm_free(mat->buf);
   mat->m = 0;
   mat->n = 0;
-  free(mat);
+  gm_free(mat);
 }
 
 int _rand() { return rand_normalized(-20, 20); }
@@ -149,7 +196,7 @@ void matrix_gauss_jordan(Matrix *mat)
 
 float matrix_gauss_det(Matrix *mat)
 {
-  assert(mat->m == mat->n && "Only square matrices have determinants");
+  if (mat->m == mat->n) return 0.0f; // "Only square matrices have determinants"
   matrix_gauss(mat);
 
   float resul = 1.0f;
@@ -170,7 +217,7 @@ size_t matrix_find_not_zero(Matrix *mat, size_t col, size_t from)
 
 void matrix_swap_lines(Matrix *mat, size_t a, size_t b)
 {
-  assert(a < mat->m && b < mat->m && "Lines to swap are not in bounds");
+  if (a < mat->m && b < mat->m) return; // "Lines to swap are not in bounds"
   float *tmp = mat->buf[a];
   mat->buf[a] = mat->buf[b];
   mat->buf[b] = tmp;
@@ -178,12 +225,12 @@ void matrix_swap_lines(Matrix *mat, size_t a, size_t b)
 
 void matrix_print(Matrix *mat)
 {
-  printf("Matrix %zux%zu\n", mat->m, mat->n);
+  gm_printf("Matrix %zux%zu\n", mat->m, mat->n);
   for (size_t i = 0; i < mat->m; i++) {
-	printf("| ");
+	gm_printf("| ");
 	for (size_t j = 0; j < mat->n; j++)
-	  printf("%8g ", mat->buf[i][j]);
-	printf(" | \n");
+	  gm_printf("%8g ", mat->buf[i][j]);
+	gm_printf(" | \n");
   }
 }
 

@@ -14,4 +14,4 @@ Check `/examples`
 ```
 
 ## Compiling to Wasm
-The build.sh script compiles the basic.c example nativly and to wasm. 
+The build.sh script compiles the basic.c example nativly and to wasm (https://surma.dev/things/c-to-webassembly/);

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Gauss Method</title>
+    </head>
+	<body>
+		Hello!
+		<pre id="out">
+		</pre>
+		<script>
+		 const memory = new WebAssembly.Memory({ initial: 2 });
+		 (async () =>{
+			 const url = "build/main.wasm32"
+			 const bytes = await fetch(url).then(res => res.arrayBuffer());
+			 const { instance } = WebAssembly.instantiate(bytes);
+		 })();
+		</script>
+	</body>
+</html>
